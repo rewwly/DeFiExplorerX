@@ -1,0 +1,90 @@
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+class DeFiExplorerX:
+    def __init__(self):
+        self.api_url = 'https://api.coingecko.com/api/v3'
+    
+    def get_defi_protocols(self):
+        """Fetches a list of DeFi protocols."""
+        url = f"{self.api_url}/defi"
+        response = requests.get(url)
+        return response.json()
+
+    def get_defi_protocol_metrics(self, protocol_id: str) -> dict:
+        """Fetches metrics for a specific DeFi protocol."""
+        url = f"{self.api_url}/defi/{protocol_id}/metrics"
+        response = requests.get(url)
+        return response.json().get('data', {})
+
+    def analyze_defi_metrics(self, protocol_id: str) -> dict:
+        """Analyzes metrics such as Total Value Locked (TVL) for a specific DeFi protocol."""
+        metrics = self.get_defi_protocol_metrics(protocol_id)
+        if not metrics:
+            return {
+                'protocol_id': protocol_id,
+                'total_value_locked': 0,
+                'liquidity': 0,
+                'trading_volume': 0
+            }
+        total_value_locked = metrics.get('total_value_locked', 0)
+        liquidity = metrics.get('liquidity', 0)
+        trading_volume = metrics.get('trading_volume', 0)
+        return {
+            'protocol_id': protocol_id,
+            'total_value_locked': total_value_locked,
+            'liquidity': liquidity,
+            'trading_volume': trading_volume
+        }
+
+    def get_historical_tvl(self, protocol_id: str, days: int) -> pd.DataFrame:
+        """Fetches historical TVL data for a specific DeFi protocol."""
+        url = f"{self.api_url}/defi/{protocol_id}/history"
+        params = {
+            'vs_currency': 'usd',
+            'days': days,
+            'interval': 'daily'
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        tvl_history = data.get('total_value_locked', [])
+        df = pd.DataFrame(tvl_history, columns=['timestamp', 'tvl'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('timestamp', inplace=True)
+        return df
+
+    def plot_defi_tvl(self, protocol_id: str, days: int):
+        """Plots historical TVL data for a specific DeFi protocol."""
+        df = self.get_historical_tvl(protocol_id, days)
+        if df.empty:
+            print("No TVL data found.")
+            return
+
+        plt.figure(figsize=(12, 6))
+        df['tvl'].plot()
+        plt.title(f'{protocol_id.capitalize()} Total Value Locked (TVL) Trend')
+        plt.xlabel('Date')
+        plt.ylabel('Total Value Locked (USD)')
+        plt.grid(True)
+        plt.show()
+
+# Example Usage
+if __name__ == "__main__":
+    defi_explorer_x = DeFiExplorerX()
+
+    # Fetch and Display DeFi Protocols
+    defi_protocols = defi_explorer_x.get_defi_protocols()
+    print("DeFi Protocols:")
+    for protocol in defi_protocols:
+        print(protocol)
+
+    # Analyze and Display Metrics for a Specific DeFi Protocol
+    protocol_id = 'uniswap'  # Replace with the protocol ID you want to analyze
+    metrics = defi_explorer_x.analyze_defi_metrics(protocol_id)
+    print(f"Metrics for protocol {protocol_id.capitalize()}:")
+    print(metrics)
+
+    # Plot Historical TVL Data
+    defi_explorer_x.plot_defi_tvl(protocol_id=protocol_id, days=30)  # Last 30 days
